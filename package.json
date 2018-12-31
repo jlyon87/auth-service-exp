@@ -1,0 +1,20 @@
+{
+  "name": "auth-service-exp",
+  "version": "1.0.0",
+  "description": "testing an express server for local auth",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bcrypt": "^3.0.3",
+    "body-parser": "^1.18.3",
+    "express": "^4.16.4",
+    "jsonwebtoken": "^8.4.0",
+    "rethinkdb": "^2.3.3",
+    "rethinkdb-init": "^0.2.2"
+  }
+}
