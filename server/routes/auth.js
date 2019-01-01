@@ -5,20 +5,17 @@ module.exports = db => {
   const rUsers = require('../db/objects/users')(db)
 
   const register = (req, res) => {
-    const data = {
-      type: 'registered',
-      message: 'registered'
-    }
-
     const { username, email, password } = req.body
     if(!username || !email || !password) {
-      return res.status(400).send('Username, email, and password required.')
+      return res.status(422).send('Username, email, and password required.')
     }
 
     rUsers.queryUserByEmail(email, ['email'])
       .then(user => {
         if(user) {
-          return res.status(400).send('This email is already registered.')
+          const err = new Error('This email is already registered.')
+          err.statusCode = 422
+          throw err
         }
         return rUsers.insertUser(req.body)
       })
@@ -28,17 +25,8 @@ module.exports = db => {
       })
       .catch(err => {
         console.error('Fatal Error: ', err.message)
-        // return res.status(500).json({
-        //   message: 'Fatal server error',
-        //   err
-        // })
+        return res.status(err.statusCode || 500).send(err.message)
       })
-
-    // Is Valid?
-    // Does user already exist?
-    // create User
-    // create token
-    // respond with token
   }
 
   const login = (req, res) => {
@@ -55,19 +43,26 @@ module.exports = db => {
   }
 
   const me = (req, res) => {
-    const token = req.headers['x-access-token']
-    if(token) {
-      const user = jwt.deserialize(token)
-      if(user.exp <= Date.now()) {
-        return res.status(401).send('Unauthorized.')
-      }
+    const accessToken = req.headers['x-access-token']
 
-      return res.json(user)
+    if (!accessToken) {
+      return res.status(401).send('Unauthorized.')
     }
-    return res.status(401).send('Unauthorized.')
-    // has header x-access-token ?
-    // deserialize token
-    // respond with user
+
+    const token = jwt.deserialize(accessToken)
+    const now = Date.now()
+    if(token.exp >= now) {
+      return res.status(401).send('Unauthorized.')
+    }
+
+    rUsers.queryUserById(token.id)
+      .then(user => {
+        res.json(user)
+      })
+      .catch(err => {
+        console.error('Error: ', err.message)
+        res.status(404).send('User not found')
+      })
   }
 
   router.use('/', (req, res, next) => {

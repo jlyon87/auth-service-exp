@@ -24,7 +24,7 @@ module.exports = r => {
       })
   }
 
-  const queryUserByEmail = (email, fields) => {
+  const queryUserByEmail = (email, fields = ['id', 'email']) => {
     return rUsers.filter({ email }).pluck(...fields).limit(1).run(r.conn)
       .then(cursor => cursor.toArray())
       .then(results => {
@@ -37,10 +37,8 @@ module.exports = r => {
       })
   }
 
-  const queryUserById = id => {
-    return rUsers.get(id).run(r.conn)
-      .then(console.log)
-      .catch(console.error)
+  const queryUserById = (id, fields = ['id', 'username', 'email']) => {
+    return rUsers.get(id).pluck(...fields).run(r.conn)
   }
 
   return {
