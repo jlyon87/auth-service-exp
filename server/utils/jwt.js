@@ -8,8 +8,14 @@ const serialize = ({ id, email }) => {
 }
 
 const deserialize = token => {
-  const user = jwt.verify(token, JWT_SECRET)
-  return user
+  return new Promise((resolve, reject) => {
+    return jwt.verify(token, JWT_SECRET, (err, decoded) => {
+      if (err) {
+        reject(err)
+      }
+      resolve(decoded)
+    })
+  })
 }
 
 module.exports = {

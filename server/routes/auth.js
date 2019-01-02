@@ -1,5 +1,12 @@
 const router = require('express').Router()
+const bcrypt = require('bcrypt')
 const jwt = require('../utils/jwt')
+
+const throwError = (code, message) => {
+  const err = new Error(message)
+  err.statusCode = code
+  throw err
+}
 
 module.exports = db => {
   const rUsers = require('../db/objects/users')(db)
@@ -13,15 +20,12 @@ module.exports = db => {
     rUsers.queryUserByEmail(email, ['email'])
       .then(user => {
         if(user) {
-          const err = new Error('This email is already registered.')
-          err.statusCode = 422
-          throw err
+          throwError(422, 'This email is already registered.')
         }
         return rUsers.insertUser(req.body)
       })
       .then(id => {
-        const token = jwt.serialize({ id, email })
-        return res.json({ token })
+        return res.json({ id })
       })
       .catch(err => {
         console.error('Fatal Error: ', err.message)
@@ -30,16 +34,34 @@ module.exports = db => {
   }
 
   const login = (req, res) => {
-    const data = {
-      type: 'login',
-      message: 'logged in.'
+    const { email, password } = req.body
+    if (!email || !password) {
+      return res.status(422).send('Email and password required.')
     }
-    res.json(data)
 
-    // is Valid?
-    // Does user Exist?
-    // create token
-    // respond with token
+    rUsers.queryUserByEmail(email, ['id', 'username', 'email', 'password'])
+      .then(user => {
+        if (!user) {
+          throwError(401, 'Invalid email or password.')
+        }
+
+        return bcrypt.compare(password, user.password)
+          .then(isValid => {
+            if (!isValid) {
+              throwError(401, 'Invalid email or password.')
+            }
+
+            const token = jwt.serialize({ id: user.id, email: user.email })
+            res.json({ token })
+          })
+          .catch(err => {
+            throw err
+          })
+      })
+      .catch(err => {
+        console.error('Error logging in. ', err.message)
+        res.status(err.statusCode || 500).send(err.message)
+      })
   }
 
   const me = (req, res) => {
@@ -49,19 +71,24 @@ module.exports = db => {
       return res.status(401).send('Unauthorized.')
     }
 
-    const token = jwt.deserialize(accessToken)
-    const now = Date.now()
-    if(token.exp >= now) {
-      return res.status(401).send('Unauthorized.')
-    }
+    jwt.deserialize(accessToken)
+      .then(decoded => {
+        const now = Date.now()
+        if(decoded.exp >= now) {
+          return res.status(401).send('Unauthorized.')
+        }
 
-    rUsers.queryUserById(token.id)
+        return rUsers.queryUserById(decoded.id)
+      })
       .then(user => {
+        if (!user) {
+          throwError(400, 'User not found.')
+        }
         res.json(user)
       })
       .catch(err => {
         console.error('Error: ', err.message)
-        res.status(404).send('User not found')
+        res.status(err.statusCode || 500).send(err.message || 'Unhandled Exception.')
       })
   }
 
